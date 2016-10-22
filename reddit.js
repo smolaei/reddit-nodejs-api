@@ -102,24 +102,35 @@ module.exports = function RedditAPI(conn) {
       var offset = (options.page || 0) * limit;
 
       conn.query(`
-        SELECT p.id as postId, 
+        SELECT p.id AS postId, 
         p.title, p.url, 
-        p.createdAt as postCreatedAt, 
-        p.updatedAt as postUpdatedAt, 
-        u.id as usernameId, 
+        p.createdAt AS postCreatedAt, 
+        p.updatedAt AS postUpdatedAt, 
+        u.id AS usernameId, 
         u.username, 
-        u.createdAt as userCreatedAt, 
-        u.updatedAt as userUpdatedAt, 
-        s.id as subredditId, 
-        s.name as subredditName, 
-        s.description as subredditDescription, 
-        s.createdAt as subredditCreatedAt, 
-        s.updatedAt as subredditUpdatedAt
-          FROM posts as p
-          JOIN users as u ON u.id = p.userId
-          JOIN subreddit as s ON s.id = p.subredditId
+        u.createdAt AS userCreatedAt, 
+        u.updatedAt AS userUpdatedAt, 
+        s.id AS subredditId, 
+        s.name AS subredditName, 
+        s.description AS subredditDescription, 
+        s.createdAt AS subredditCreatedAt, 
+        s.updatedAt AS subredditUpdatedAt,
+           SUM(v.vote) as voteScore,
+           (SUM(v.vote))*100000000/(now() - p.createdAt) as hottest,
+           COUNT(*) as totalVotes,
+           SUM(IF(v.vote = 1, 1, 0)) AS numUpVotes,
+           SUM(IF(v.vote = -1, 1, 0)) AS numDownVotes,
+           CASE 
+            WHEN SUM(IF(v.vote = 1, 1, 0)) < SUM(IF(v.vote = -1, 1,0)) 
+               THEN COUNT(*) * SUM(IF(v.vote = -1, 1,0)) / SUM(IF(v.vote = 1, 1,0))
+               ELSE COUNT(*) * SUM(IF(v.vote = 1, 1,0)) / SUM(IF(v.vote = -1, 1,0))
+            END AS controversialRanking
+          FROM posts AS p
+          JOIN users AS u ON u.id = p.userId
+          JOIN subreddit AS s ON s.id = p.subredditId
+          JOIN votes AS v ON p.id = v.postId
           GROUP BY postId
-          ORDER BY postCreatedAt DESC;`, [limit, offset],
+          ORDER BY postCreatedAt DESC`, [limit, offset],
         function(err, results) {
           if (err) {
             callback(err);
@@ -147,7 +158,13 @@ module.exports = function RedditAPI(conn) {
                   description: value.subredditDescription,
                   createdAt: value.subredditCreatedAt,
                   updatedAt: value.subredditUpdatedAt
-                }
+                },
+                voteScore: value.voteScore,
+                numUpVotes: value.numUpVotes,
+                numDownVotes: value.numDownVotes,
+                totalVotes: value.totalVotes,
+                hotnessRanking: value.hottest,
+                controversialRanking: value.controversialRanking,
               }
             })
             callback(null, formatedResults);
@@ -259,7 +276,7 @@ module.exports = function RedditAPI(conn) {
           callback(err);
         }
         else {
-         var formatedResults =  result.map(function(ele) {
+          var formatedResults = result.map(function(ele) {
             return {
               id: ele.id,
               name: ele.name,
@@ -271,6 +288,35 @@ module.exports = function RedditAPI(conn) {
           callback(null, formatedResults);
         }
       });
+    },
+    createOrUpdateVote: function(vote, callback) {
+      if (vote.vote === -1 || vote.vote === 0 || vote.vote === 1) {
+        console.log("You have voted " + vote.vote + " for this post");
+        conn.query(
+          `INSERT INTO votes (postId, userId, vote, createdAt)
+          VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE vote = ?, updatedAt = ?`, [vote.postId, vote.userId, vote.vote, new Date(), vote.vote, new Date()],
+          function(err, result) {
+            if (err) {
+              callback(err);
+            }
+            else {
+              conn.query(
+                `SELECT * FROM votes`,
+                function(err, result) {
+                  if (err) {
+                    callback(err);
+                  }
+                  else {
+                    callback(null, result);
+                  }
+                }
+              );
+            }
+          });
+      }
+      else {
+        callback('Vote has to be equal to 0,1 or -1');
+      }
     }
   }
 }
