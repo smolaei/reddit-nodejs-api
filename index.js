@@ -1,12 +1,12 @@
 var express = require('express');
 var app = express();
 
-app.get('/hello', function (req, res) {
-  res.send("<h1>Hello World!</h1>");
-});
+// app.get('/hello', function (req, res) {
+//   res.send("<h1>Hello World!</h1>");
+// });
 
-app.get("/hello?name=firstName", function (req, res) {
-  res.send("<h1>Hello _name_!</h1>");
+app.get('/hello', function (req, res) {
+  res.send("<h1>Hello :" + req.query.name + "!</h1>");
 });
 
 
