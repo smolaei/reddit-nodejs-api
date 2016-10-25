@@ -1,0 +1,11 @@
+
+block content
+    div(id="contents")
+    h1 List of contents
+    ul(class="contents-list")
+        each post in posts
+            li(class = "content-item")
+            h2(class = "content-item__title")
+            a(href="http://" +  post.post.url)= post.post.title
+            p= 'Created by ' + post.user.username
+            

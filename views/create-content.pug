@@ -1,0 +1,9 @@
+extends layout.pug
+
+block content
+form(action="/createContent", method="POST")
+  div
+    input(type="text", name="url", placeholder="Enter a URL to content")
+  div
+    input(type="text", name="title", placeholder="Enter the title of your content")
+  button(type="submit") Create!

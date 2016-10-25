@@ -1,60 +1,78 @@
 var express = require('express');
+var pug = require('pug')
 var app = express();
+var reddit = require('./reddit');
+var mysql = require('mysql');
+var bodyParser = require('body-parser')
+
+app.use(bodyParser.json()); // support json encoded bodies
+app.use(bodyParser.urlencoded({
+    extended: true
+}));
+
+app.set('view engine', 'pug');
 
 
-// Exercise 1
-// app.get('/hello', function (req, res) {
-//   res.send("<h1>Hello World!</h1>");
-// });
+var connection = mysql.createConnection({
+    host: 'localhost',
+    user: 'smolaei',
+    password: '',
+    database: 'reddit'
+});
+var redditAPI = reddit(connection);
 
-
-// Exercise 2
-// app.get('/hello', function (req, res) {
-//   res.send("<h1>Hello :" + req.query.name + "!</h1>");
-// });
-
-
-// Exercise 2B
-// app.get('/hello/friend/:name', function(req, res, next) { 
-//     res.send("<h1>  Hello : " + req.params.name + "</h1"); 
-// });
-
-// Exercise 3:
-
-app.get("/calculator/:operation", function(req, res, next) {
-    var objResult = {
-        "operator": "",
-        "firstOperand": req.query.num1,
-        "secondOperand": req.query.num2,
-        "solution": ""
-    }
-    if (req.params.operation === 'add') {
-        objResult.operator = req.params.operation;
-        objResult.solution = Number(req.query.num1) + Number(req.query.num2);
-        res.send(JSON.stringify(objResult))
-    }
-    else if (req.params.operation === 'div'){
-        objResult.operator = req.params.operation;
-        objResult.solution = Number(req.query.num2) / Number(req.query.num1);
-        res.send(JSON.stringify(objResult))
-    }
-    else if (req.params.operation === 'sub'){
-        objResult.operator = req.params.operation;
-        objResult.solution = Number(req.query.num2) - Number(req.query.num1);
-        res.send(JSON.stringify(objResult))
-    }
-    else if (req.params.operation === 'mult'){
-        objResult.operator = req.params.operation;
-        objResult.solution = Number(req.query.num2) * Number(req.query.num1);
-        res.send(JSON.stringify(objResult))
-    }
-    
-    else if (req.params.operation !== "mult" || req.params.operation !== "sub" || req.params.operation !== "div" || req.params.operation !== "add"){
-        res.status(405).send("Please use amongst the following operators in your query: div, add, mult, sub")
-    }
-    res.end();
+//Exercise 4: with getAllPosts
+app.get('/posts', function(request, response) {
+    redditAPI.getAllPosts({
+        numPerPage: 5,
+        page: 0
+    }, "voteScore", function(err, result) {
+        if (err) {
+            console.log(err);
+            response.status(500).send('oops try again later!');
+        }
+        else {
+            response.render('post-list', {
+                posts: result
+            })
+        }
+    });
 });
 
+//Exercise 5:
+
+app.get('/createContent', function(request, response) {
+
+    response.render('create-content');
+});
+
+// //Exercise 6:
+
+app.post('/createContent', function(request, response) {
+    var user = {
+
+        url: request.body.url,
+        title: request.body.title
+
+    };
+
+    var inputObj = {
+        userId: 1,
+        url: request.body.url,
+        title: request.body.title
+    }
+
+    redditAPI.createPost(inputObj, 1, function(err, res) {
+        if (err) {
+            console.log(err.stack)
+        }
+        else {
+            console.log(res);
+        }
+    })
+
+    response.redirect('/posts')
+})
 
 
 /* YOU DON'T HAVE TO CHANGE ANYTHING BELOW THIS LINE :) */
